@@ -55,11 +55,12 @@ export function applyShot(game, shot) {
   }
   if (shot === 'alert') {
     // The near miss: a guard has the player in a red cone by the exit,
-    // the player one dash from the door.
+    // the player one dash from the door. The guard is pinned ~5.4 tiles
+    // away, so the chase cannot reach the player inside one screenshot.
     game.state = 'playing';
     placePlayer(game, 27, 15, Math.PI / 4);
     placeGuard(game, 0, 15, 3, Math.PI, 'patrol', 0);
-    placeGuard(game, 1, 24, 13, Math.PI / 4, 'chase', 1);
+    placeGuard(game, 1, 22, 13, 0.38, 'chase', 1);
     return true;
   }
   if (shot === 'exit') {

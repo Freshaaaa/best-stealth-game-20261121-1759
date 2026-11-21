@@ -37,35 +37,45 @@ function buildFloorTexture(world, levelIndex) {
       const x = tx * TILE;
       const y = ty * TILE;
       const h = hash2(tx, ty);
-      // Two-tone base with a whisper of per-tile brightness change.
-      const bright = 0.9 + h * 0.22;
+      // Two-tone base with a strong per-tile brightness change: the
+      // neon-noir floor reads dark, but no two tiles are alike.
+      const bright = 0.78 + h * 0.42;
       g.fillStyle = (tx + ty) % 2 === 0 ? shade(COLORS.floorA, bright) : shade(COLORS.floorB, bright);
       g.fillRect(x, y, TILE, TILE);
       // Speckles and wear.
       g.fillStyle = COLORS.floorSpeck;
-      for (let s = 0; s < 4; s++) {
+      for (let s = 0; s < 5; s++) {
         const sx = x + 4 + hash2(tx * 7 + s, ty * 3 + s) * (TILE - 8);
         const sy = y + 4 + hash2(tx * 3 + s, ty * 7 + s) * (TILE - 8);
         g.fillRect(sx, sy, 2, 2);
       }
       const h2 = hash2(tx + 31, ty + 17);
-      if (h2 > 0.94) {
+      if (h2 > 0.95) {
         // Floor grate: dark slats.
         g.fillStyle = COLORS.floorGrate;
         g.fillRect(x + 6, y + 8, TILE - 12, TILE - 16);
         g.fillStyle = 'rgba(255,255,255,0.06)';
         for (let s = 0; s < 3; s++) g.fillRect(x + 9, y + 11 + s * 7, TILE - 18, 2);
-      } else if (h2 > 0.88) {
-        // Old stain.
+      } else if (h2 > 0.90) {
+        // Old oil stain.
         g.fillStyle = COLORS.floorStain;
         g.beginPath();
-        g.ellipse(x + TILE / 2, y + TILE / 2, 12 + h * 6, 8 + h * 5, h * 2, 0, Math.PI * 2);
+        g.ellipse(x + TILE / 2, y + TILE / 2, 14 + h * 7, 9 + h * 6, h * 2, 0, Math.PI * 2);
         g.fill();
-      } else if (h2 > 0.84) {
+      } else if (h2 > 0.85) {
         // Faded floor marking.
-        g.strokeStyle = 'rgba(255, 209, 102, 0.14)';
+        g.strokeStyle = 'rgba(255, 209, 102, 0.16)';
         g.lineWidth = 2;
         g.strokeRect(x + 8.5, y + 8.5, TILE - 17, TILE - 17);
+      } else if (h2 > 0.80) {
+        // Hairline crack across the tile.
+        g.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+        g.lineWidth = 1;
+        g.beginPath();
+        g.moveTo(x + 4 + h * 8, y + 2);
+        g.lineTo(x + 12 + h * 10, y + TILE / 2);
+        g.lineTo(x + 6 + h * 12, y + TILE - 3);
+        g.stroke();
       }
       // Tile seam.
       g.strokeStyle = COLORS.floorLine;
@@ -103,11 +113,11 @@ function drawDarkZones(ctx, world, time) {
     const w = z.w * TILE;
     const h = z.h * TILE;
     const grad = ctx.createLinearGradient(x, y, x, y + h);
-    grad.addColorStop(0, 'rgba(6, 10, 20, 0.62)');
-    grad.addColorStop(1, 'rgba(6, 10, 20, 0.45)');
+    grad.addColorStop(0, 'rgba(3, 6, 12, 0.72)');
+    grad.addColorStop(1, 'rgba(3, 6, 12, 0.55)');
     ctx.fillStyle = grad;
     ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = 'rgba(140, 170, 220, 0.22)';
+    ctx.strokeStyle = 'rgba(53, 245, 216, 0.28)';
     ctx.setLineDash([5, 7]);
     ctx.lineWidth = 1;
     ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
@@ -116,6 +126,17 @@ function drawDarkZones(ctx, world, time) {
     const shimmer = 0.05 + 0.04 * Math.sin(time * 1.2 + z.x);
     ctx.fillStyle = `rgba(150, 180, 230, ${shimmer})`;
     ctx.fillRect(x + 2, y + 2, w - 4, 3);
+    // Teal corner ticks: the safe dark, marked.
+    ctx.fillStyle = 'rgba(53, 245, 216, 0.5)';
+    const t = 7;
+    ctx.fillRect(x + 1, y + 1, t, 2);
+    ctx.fillRect(x + 1, y + 1, 2, t);
+    ctx.fillRect(x + w - 1 - t, y + 1, t, 2);
+    ctx.fillRect(x + w - 3, y + 1, 2, t);
+    ctx.fillRect(x + 1, y + h - 3, t, 2);
+    ctx.fillRect(x + 1, y + h - 1 - t, 2, t);
+    ctx.fillRect(x + w - 1 - t, y + h - 3, t, 2);
+    ctx.fillRect(x + w - 3, y + h - 1 - t, 2, t);
   }
 }
 
@@ -190,6 +211,209 @@ function drawWallsAndCrates(ctx, world) {
   }
 }
 
+// --- Floor props: visual only, never solid. They fill the empty floor
+// so a screenshot reads dense and lived-in: barrels, pipes, cables,
+// scattered papers, reflective puddles, plants, vents, hazard stripes. ---
+function drawDecor(ctx, world, time) {
+  const decor = world.def.decor || [];
+  for (const d of decor) {
+    const cx = (d.tx + 0.5) * TILE;
+    const cy = (d.ty + 0.5) * TILE;
+    const h = hash2(d.tx * 3 + 1, d.ty * 5 + 2);
+    if (d.t === 'barrel') {
+      // Rust drum: ground shadow, rust gradient, top ellipse, metal band.
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.beginPath();
+      ctx.ellipse(cx + 2, cy + 12, 15, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      const g = ctx.createLinearGradient(cx - 14, cy - 14, cx + 14, cy + 14);
+      g.addColorStop(0, '#96543a');
+      g.addColorStop(0.55, COLORS.barrel);
+      g.addColorStop(1, COLORS.barrelDark);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255, 190, 140, 0.25)';
+      ctx.beginPath();
+      ctx.ellipse(cx - 3, cy - 5, 9, 5, -0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = COLORS.barrelEdge;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 8, 0.3, Math.PI - 0.3);
+      ctx.stroke();
+    } else if (d.t === 'pipe') {
+      // A run of pipe along the floor: body, top highlight, joint rings.
+      const x = d.tx * TILE + 4;
+      const y = d.ty * TILE + 4;
+      const w = d.w * TILE - 8;
+      const hh = d.h * TILE - 8;
+      const horizontal = d.w >= d.h;
+      const g = horizontal
+        ? ctx.createLinearGradient(0, y, 0, y + hh)
+        : ctx.createLinearGradient(x, 0, x + w, 0);
+      g.addColorStop(0, COLORS.pipeLight);
+      g.addColorStop(0.5, COLORS.pipe);
+      g.addColorStop(1, COLORS.pipeDark);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, hh, 6);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      // Joint rings every two tiles.
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+      ctx.lineWidth = 2;
+      const steps = Math.max(1, Math.floor((horizontal ? d.w : d.h) / 2));
+      for (let s = 1; s <= steps; s++) {
+        if (horizontal) {
+          const px = x + (w * s) / (steps + 1);
+          ctx.beginPath();
+          ctx.moveTo(px, y + 2);
+          ctx.lineTo(px, y + hh - 2);
+          ctx.stroke();
+        } else {
+          const py = y + (hh * s) / (steps + 1);
+          ctx.beginPath();
+          ctx.moveTo(x + 2, py);
+          ctx.lineTo(x + w - 2, py);
+          ctx.stroke();
+        }
+      }
+    } else if (d.t === 'cable') {
+      // A loose cable snaking across the floor.
+      const ex = (d.ex + 0.5) * TILE;
+      const ey = (d.ey + 0.5) * TILE;
+      const mx = (cx + ex) / 2 + (h - 0.5) * 44;
+      const my = (cy + ey) / 2 + (0.5 - h) * 44;
+      ctx.strokeStyle = 'rgba(8, 10, 16, 0.85)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.quadraticCurveTo(mx, my, ex, ey);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255, 176, 46, 0.35)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 1);
+      ctx.quadraticCurveTo(mx, my - 1, ex, ey - 1);
+      ctx.stroke();
+    } else if (d.t === 'paper') {
+      // A scattered sheet: off-white, slight rotation, two ruled lines.
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate((h - 0.5) * 1.4);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fillRect(-4, -5, 11, 14);
+      ctx.fillStyle = COLORS.paper;
+      ctx.fillRect(-5, -6, 11, 14);
+      ctx.strokeStyle = 'rgba(90, 100, 120, 0.7)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-2, -2);
+      ctx.lineTo(3, -2);
+      ctx.moveTo(-2, 2);
+      ctx.lineTo(2, 2);
+      ctx.stroke();
+      ctx.restore();
+    } else if (d.t === 'puddle') {
+      // Standing water: dark mirror that catches the lamplight.
+      const rx = (d.r || 1) * TILE;
+      const ry = rx * 0.55;
+      const shimmer = 0.10 + 0.05 * Math.sin(time * 1.8 + d.tx * 2 + d.ty);
+      const g = ctx.createRadialGradient(cx, cy, 2, cx, cy, rx);
+      g.addColorStop(0, `rgba(150, 190, 255, ${shimmer + 0.06})`);
+      g.addColorStop(0.6, COLORS.puddle);
+      g.addColorStop(1, 'rgba(140, 180, 255, 0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Amber sheen streak + a bright specular dot.
+      ctx.fillStyle = COLORS.puddleSheen;
+      ctx.beginPath();
+      ctx.ellipse(cx - rx * 0.25, cy - ry * 0.3, rx * 0.42, ry * 0.22, -0.25, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255, 240, 200, 0.5)';
+      ctx.beginPath();
+      ctx.arc(cx + rx * 0.3, cy - ry * 0.25, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (d.t === 'plant') {
+      // A hardy corner plant: dark green blades with teal tips.
+      ctx.strokeStyle = COLORS.plant;
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      for (let b = 0; b < 6; b++) {
+        const a = -Math.PI / 2 + (b - 2.5) * 0.38;
+        const len = 13 + hash2(d.tx + b, d.ty) * 9;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy + 10);
+        ctx.quadraticCurveTo(
+          cx + Math.cos(a) * len * 0.5,
+          cy + 10 + Math.sin(a) * len * 0.5,
+          cx + Math.cos(a) * len,
+          cy + 10 + Math.sin(a) * len,
+        );
+        ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(53, 245, 216, 0.4)';
+      ctx.lineWidth = 1.5;
+      for (let b = 0; b < 3; b++) {
+        const a = -Math.PI / 2 + (b - 1) * 0.5;
+        const len = 15 + hash2(d.tx, d.ty + b) * 8;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(a) * len * 0.55, cy + 10 + Math.sin(a) * len * 0.55);
+        ctx.lineTo(cx + Math.cos(a) * len, cy + 10 + Math.sin(a) * len);
+        ctx.stroke();
+      }
+      ctx.fillStyle = COLORS.plantDark;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy + 11, 9, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (d.t === 'vent') {
+      // Floor vent: dark recess with bright slats.
+      ctx.fillStyle = COLORS.vent;
+      ctx.fillRect(cx - 15, cy - 11, 30, 22);
+      ctx.strokeStyle = 'rgba(120, 150, 200, 0.25)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cx - 15.5, cy - 11.5, 31, 23);
+      ctx.fillStyle = 'rgba(160, 180, 220, 0.20)';
+      for (let s = 0; s < 3; s++) ctx.fillRect(cx - 12, cy - 7 + s * 7, 24, 2);
+    } else if (d.t === 'hazard') {
+      // Faded hazard strip: amber with black diagonals.
+      const x = d.tx * TILE;
+      const y = d.ty * TILE + TILE * 0.3;
+      const w = d.w * TILE;
+      const hh = TILE * 0.4;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x, y, w, hh);
+      ctx.clip();
+      ctx.fillStyle = COLORS.hazard;
+      ctx.globalAlpha = 0.75;
+      ctx.fillRect(x, y, w, hh);
+      ctx.fillStyle = 'rgba(10, 10, 12, 0.85)';
+      for (let s = -1; s < d.w * 2 + 1; s++) {
+        ctx.beginPath();
+        ctx.moveTo(x + s * 20, y + hh);
+        ctx.lineTo(x + s * 20 + 10, y);
+        ctx.lineTo(x + s * 20 + 20, y);
+        ctx.lineTo(x + s * 20 + 10, y + hh);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+}
+
 function drawLamps(ctx, world, time) {
   const lamps = world.def.lamps || [];
   if (lamps.length === 0) return;
@@ -199,13 +423,25 @@ function drawLamps(ctx, world, time) {
   for (const [tx, ty] of lamps) {
     const x = (tx + 0.5) * TILE;
     const y = (ty + 0.5) * TILE;
-    const flicker = 0.92 + 0.08 * Math.sin(time * 7 + tx * 3 + ty);
-    const pool = ctx.createRadialGradient(x, y, 6, x, y, 120 * flicker);
-    pool.addColorStop(0, 'rgba(255, 190, 100, 0.30)');
-    pool.addColorStop(0.5, 'rgba(255, 170, 80, 0.10)');
+    const flicker = 0.88 + 0.12 * Math.sin(time * 7 + tx * 3 + ty);
+    const pool = ctx.createRadialGradient(x, y, 6, x, y, 150 * flicker);
+    pool.addColorStop(0, 'rgba(255, 190, 100, 0.38)');
+    pool.addColorStop(0.5, 'rgba(255, 170, 80, 0.13)');
     pool.addColorStop(1, 'rgba(255, 170, 80, 0)');
     ctx.fillStyle = pool;
-    ctx.fillRect(x - 130, y - 130, 260, 260);
+    ctx.fillRect(x - 160, y - 160, 320, 320);
+    // A soft shaft of light falling from the lamp.
+    const shaft = ctx.createLinearGradient(0, y, 0, y + 110);
+    shaft.addColorStop(0, 'rgba(255, 200, 120, 0.07)');
+    shaft.addColorStop(1, 'rgba(255, 200, 120, 0)');
+    ctx.fillStyle = shaft;
+    ctx.beginPath();
+    ctx.moveTo(x - 7, y);
+    ctx.lineTo(x + 7, y);
+    ctx.lineTo(x + 26, y + 110);
+    ctx.lineTo(x - 26, y + 110);
+    ctx.closePath();
+    ctx.fill();
   }
   ctx.restore();
   // Fixtures: a small ceiling lamp dot with a hot core.
@@ -229,18 +465,18 @@ function drawLamps(ctx, world, time) {
 }
 
 function drawExit(ctx, world, time) {
-  const pulse = 0.55 + 0.25 * Math.sin(time * 3);
+  const pulse = 0.65 + 0.3 * Math.sin(time * 3);
   const x = world.exit.x;
   const y = world.exit.y;
-  // Layered glow.
+  // Layered glow, wider and hotter than before.
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  const glow = ctx.createRadialGradient(x, y, 4, x, y, TILE * 1.9);
-  glow.addColorStop(0, `rgba(57, 217, 138, ${pulse})`);
-  glow.addColorStop(0.5, `rgba(57, 217, 138, ${pulse * 0.35})`);
-  glow.addColorStop(1, 'rgba(57, 217, 138, 0)');
+  const glow = ctx.createRadialGradient(x, y, 4, x, y, TILE * 2.4);
+  glow.addColorStop(0, `rgba(43, 255, 158, ${pulse})`);
+  glow.addColorStop(0.5, `rgba(43, 255, 158, ${pulse * 0.4})`);
+  glow.addColorStop(1, 'rgba(43, 255, 158, 0)');
   ctx.fillStyle = glow;
-  ctx.fillRect(x - TILE * 2, y - TILE * 2, TILE * 4, TILE * 4);
+  ctx.fillRect(x - TILE * 2.5, y - TILE * 2.5, TILE * 5, TILE * 5);
   ctx.restore();
   // Door frame + door with chevrons.
   ctx.fillStyle = '#0a2e1d';
@@ -369,16 +605,19 @@ function drawCone(ctx, world, guard, time) {
   ctx.fillStyle = g;
   ctx.fillRect(guard.x - VISION_RANGE, guard.y - VISION_RANGE, VISION_RANGE * 2, VISION_RANGE * 2);
   ctx.restore();
-  // Soft rim along the cone's two straight sides only. The far edge is
-  // the wall contour — stroking it would trace every step of the raycast.
+  // Soft rim along the cone's two straight sides only, with a hot glow.
+  // The far edge is the wall contour — stroking it would trace every step
+  // of the raycast.
   ctx.save();
   ctx.globalAlpha = pulse;
   const a0 = guard.angle - VISION_HALF_ANGLE;
   const a1 = guard.angle + VISION_HALF_ANGLE;
   const l0 = rayLength(world, guard.x, guard.y, a0);
   const l1 = rayLength(world, guard.x, guard.y, a1);
+  ctx.shadowColor = colors.edge;
+  ctx.shadowBlur = 10;
   ctx.strokeStyle = colors.edge;
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(guard.x, guard.y);
   ctx.lineTo(guard.x + Math.cos(a0) * l0, guard.y + Math.sin(a0) * l0);
@@ -466,6 +705,17 @@ function drawGuard(ctx, world, guard, time) {
 function drawPlayer(ctx, player, time) {
   const moving = player.moving;
   const bob = moving ? Math.sin(time * 14) * 1.2 : 0;
+  // Hot teal halo: the hero glows so the eye finds them first.
+  const haloPulse = 0.85 + 0.15 * Math.sin(time * 2.4);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const halo = ctx.createRadialGradient(player.x, player.y, 4, player.x, player.y, 52);
+  halo.addColorStop(0, `rgba(53, 245, 216, ${0.30 * haloPulse})`);
+  halo.addColorStop(0.55, `rgba(53, 245, 216, ${0.10 * haloPulse})`);
+  halo.addColorStop(1, 'rgba(53, 245, 216, 0)');
+  ctx.fillStyle = halo;
+  ctx.fillRect(player.x - 56, player.y - 56, 112, 112);
+  ctx.restore();
   ctx.save();
   ctx.translate(player.x, player.y + bob);
   // Ground shadow.
@@ -532,11 +782,17 @@ function drawDust(ctx, time) {
 }
 
 function drawVignette(ctx) {
-  const g = ctx.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.32, VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.95);
-  g.addColorStop(0, 'rgba(3, 5, 10, 0)');
+  const g = ctx.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.30, VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.95);
+  g.addColorStop(0, 'rgba(2, 3, 8, 0)');
   g.addColorStop(1, COLORS.vignette);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  // A soft cinematic shadow from the top of the frame.
+  const top = ctx.createLinearGradient(0, 0, 0, 70);
+  top.addColorStop(0, 'rgba(2, 3, 8, 0.35)');
+  top.addColorStop(1, 'rgba(2, 3, 8, 0)');
+  ctx.fillStyle = top;
+  ctx.fillRect(0, 0, VIEW_W, 70);
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -557,9 +813,8 @@ function drawHud(ctx, game) {
   bar.addColorStop(1, '#070a12');
   ctx.fillStyle = bar;
   ctx.fillRect(0, 0, VIEW_W, 44);
-  ctx.fillStyle = 'rgba(255, 180, 84, 0.35)';
-  ctx.fillRect(0, 44, VIEW_W, 1);
-  ctx.fillStyle = COLORS.hudText;
+  ctx.fillStyle = 'rgba(255, 176, 46, 0.6)';
+  ctx.fillRect(0, 44, VIEW_W, 2);
   ctx.font = 'bold 16px sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
@@ -568,7 +823,11 @@ function drawHud(ctx, game) {
   } catch {
     // Older canvas: no letter spacing, fine.
   }
-  ctx.fillText(`NIGHTSHIFT  ·  ${level.name}`, 16, 23);
+  ctx.fillStyle = COLORS.neonTeal;
+  ctx.fillText('NIGHTSHIFT', 16, 23);
+  const nameW = ctx.measureText('NIGHTSHIFT').width;
+  ctx.fillStyle = COLORS.hudText;
+  ctx.fillText(`  ·  ${level.name}`, 16 + nameW, 23);
   try {
     ctx.letterSpacing = '0px';
   } catch {
@@ -643,17 +902,38 @@ function gradientText(ctx, text, x, y, size, top, bottom) {
   ctx.fillText(text, x, y);
 }
 
-function overlay(ctx, title, lines, accent, time, titleTop, titleBottom) {
-  ctx.fillStyle = 'rgba(5, 8, 14, 0.72)';
+function overlay(ctx, title, lines, accent, time, titleTop, titleBottom, badge, titleSize) {
+  // Lighter dim than before: the living level (cones, lamps, props)
+  // stays visible behind the text, so the title screen is a scene.
+  ctx.fillStyle = 'rgba(4, 6, 11, 0.58)';
   ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  const size = titleSize || 68;
+  const titleY = VIEW_H / 2 - 110;
+  // A small letter-spaced badge above the title, when given.
+  if (badge) {
+    ctx.save();
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = COLORS.neonAmber;
+    ctx.font = 'bold 15px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    try {
+      ctx.letterSpacing = '3px';
+    } catch {
+      // ignore
+    }
+    ctx.fillText(badge, VIEW_W / 2, titleY - size / 2 - 30);
+    ctx.restore();
+  }
   // Thin gold rule under the title.
   ctx.save();
   ctx.shadowColor = accent;
-  ctx.shadowBlur = 18;
-  gradientText(ctx, title, VIEW_W / 2, VIEW_H / 2 - 110, 68, titleTop || '#ffffff', titleBottom || '#9fb4d8');
+  ctx.shadowBlur = 22;
+  gradientText(ctx, title, VIEW_W / 2, titleY, size, titleTop || '#ffffff', titleBottom || '#9fb4d8');
   ctx.restore();
   ctx.fillStyle = accent;
-  ctx.fillRect(VIEW_W / 2 - 90, VIEW_H / 2 - 66, 180, 2);
+  ctx.fillRect(VIEW_W / 2 - 90, titleY + size / 2 + 16, 180, 2);
   ctx.fillStyle = COLORS.hudText;
   ctx.font = '20px sans-serif';
   ctx.textAlign = 'center';
@@ -675,6 +955,7 @@ export function render(ctx, game) {
   ctx.clearRect(0, 0, VIEW_W, VIEW_H);
   if (game.state === 'title') {
     drawFloor(ctx, game.world, game.levelIndex);
+    drawDecor(ctx, game.world, game.time);
     drawDarkZones(ctx, game.world, game.time);
     drawWallsAndCrates(ctx, game.world);
     drawLamps(ctx, game.world, game.time);
@@ -699,13 +980,16 @@ export function render(ctx, game) {
       ],
       COLORS.gold,
       game.time,
-      '#f4f7fc',
-      '#8fa8cc',
+      '#eafffb',
+      '#2dd4bf',
+      'A  N E O N - N O I R   S T E A L T H   G A M E',
+      84,
     );
     return;
   }
 
   drawFloor(ctx, game.world, game.levelIndex);
+  drawDecor(ctx, game.world, game.time);
   drawDarkZones(ctx, game.world, game.time);
   drawWallsAndCrates(ctx, game.world);
   drawLamps(ctx, game.world, game.time);
